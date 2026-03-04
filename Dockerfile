@@ -107,23 +107,20 @@ RUN pnpm ui:build
 # Expose the CLI binary without requiring npm global writes as non-root.
 USER root
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
-  && chmod 755 /app/openclaw.mjs
+  && chmod 755 /app/openclaw.mjs \
+  && chmod 755 /app/railway-entrypoint.sh
 
 ENV NODE_ENV=production
 
 EXPOSE 8080
 
 # Security hardening: Run as non-root user
-# The node:22-bookworm image includes a 'node' user (uid 1000)
-# This reduces the attack surface by preventing container escape via root privileges
 USER node
 
-# Start gateway server with default config.
-# For Railway/cloud deployments, bind to 0.0.0.0 (lan) so the reverse proxy can reach it.
 # Built-in probe endpoints for container health checks:
 #   - GET /healthz (liveness) and GET /readyz (readiness)
-#   - aliases: /health and /ready
 HEALTHCHECK --interval=3m --timeout=10s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:8080/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured", "--port", "8080", "--bind", "lan"]
 
+# Railway entrypoint seeds required config then launches the gateway.
+CMD ["/app/railway-entrypoint.sh"]
